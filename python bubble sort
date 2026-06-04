@@ -1,4 +1,33 @@
 OBRISI OVO KAD ZAVRSIS RETARDE
+
+konverter** 
+prvo interfejs sa metodama i onda klasu gde implementiramo 
+i njega kao koristimo u service klasi
+public interface Converter {
+    
+    public KnjigaDto toDto(Knjiga knjiga);
+    public Knjiga toEntity(KnjigaDto knjiga);
+    
+}
+public class KnjigaConverter implements Converter {
+
+    AutorRepository ar=new AutorRepository();
+    IzdavacRepository ir= new IzdavacRepository();
+    
+    @Override
+    public KnjigaDto toDto(Knjiga knjiga) {
+
+        return new KnjigaDto(knjiga.getNaziv(), knjiga.getDatumIzdavanja(), knjiga.getTiraz(), knjiga.getAutor().getId(), knjiga.getIzdavac().getId());
+        
+    }
+
+    @Override
+    public Knjiga toEntity(KnjigaDto knjiga) {
+
+        return new Knjiga(knjiga.getNaziv(), knjiga.getDatumIzdavanja(), knjiga.getTiraz(), ar.getAutorById(knjiga.getAutorId()), ir.getIzdavacById(knjiga.getIzdavacId()));
+        
+    }
+
 1) pravimo bazu i generisemo klase
     new->other->persistance->entity classes from database
 2) ubacujemo dependencies u pom.xml
@@ -105,6 +134,26 @@ public final StudentRepository studentRepository;
         studentRepository.saveStudent(new Student(studentDto.getStudentPK(), studentDto.getImePrezime(),s.getSmerById(studentDto.getSmerId()), sr.getStatusById(studentDto.getStatusId())));
         
     }
+
+**koristeci converter:
+    public final KnjigaRepository knjigaRepository;
+    public KnjigaConverter converter;
+    @Autowired
+    public KnjigaService(KnjigaRepository knjigaRepository) {
+        this.knjigaRepository = knjigaRepository;
+        this.converter=new KnjigaConverter();
+    }
+    
+    public KnjigaDto save(KnjigaDto knjigaDto){
+        knjigaRepository.save(converter.toEntity(knjigaDto));
+        return knjigaDto;
+    }
+    
+    public void delete(KnjigaDto knjigaDto){
+        knjigaRepository.delete(converter.toEntity(knjigaDto));
+    }
+
+
 9)Config klasa
 iznad naziva klase @ComponentScan(basePackages = ("naziv projekta"))
 
