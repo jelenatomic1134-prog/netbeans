@@ -93,6 +93,22 @@ private final EntityManagerFactory emf;
         em.getTransaction().commit();
         em.close();
     }
+public void delete(Knjiga knjiga) {
+
+        
+        EntityManager em = emf.createEntityManager();
+        em.getTransaction().begin();
+        
+        Long id=knjiga.getId();
+        Knjiga k =em.find(Knjiga.class,id);
+        
+        em.remove(k);
+        em.getTransaction().commit();
+        em.close();
+        
+
+        
+    }
 7.3)Spring
 private final JdbcTemplate jdbcTemplate;
 
@@ -104,6 +120,11 @@ private final JdbcTemplate jdbcTemplate;
     @Override
     public void save(Knjiga knjiga) {
         jdbcTemplate.update("INSERT INTO knjiga (naziv, godina, brojStrana, izdavac, kategorija) VALUES (?,?,?,?,?)", knjiga.getNaziv(), knjiga.getGodina(), knjiga.getBrojStrana(),knjiga.getIzdavac().getId(), knjiga.getKategorija().getId());
+    }
+ public void delete(Knjiga knjiga) {
+
+        jdbcTemplate.update("DELETE knjiga FROM knjiga WHERE id=?",knjiga.getId());
+        
     }
 7.4)Hibernate
 private SessionFactory sessionFactory;
