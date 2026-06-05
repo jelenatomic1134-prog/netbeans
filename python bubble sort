@@ -331,6 +331,23 @@ public static void main(String[] args) {
             
         } while (broj!=0);
     }
+
+
+**
+System.out.println("unesite naziv knjige: ");
+                    sc.nextLine();
+                    k.setNaziv(sc.nextLine());
+                    System.out.println("unesite dan izdavanja");
+                    dan=sc.nextInt();
+                    System.out.println("unesite mesec izdavanja");
+                    mesec=sc.nextInt();
+                    System.out.println("unesite god izdavanja");
+                    godina=sc.nextInt();
+                    
+                    datum= new Date(godina, mesec, dan);
+                    k.setDatumIzdavanja(datum);
+
+
    public void save(StudentDto studentDto){
        studentJdbcService.save(studentDto);
    } 
