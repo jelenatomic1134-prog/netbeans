@@ -1,0 +1,393 @@
+Sređivanje podataka
+1.	Učitavanje podataka:
+df = pd.read_csv('pathdofajla.extenzija')
+1.2.	Može i kako bi se preskočio drugi korak:
+df = pd.read_csv("pathdofajla.ext", na_values=['-', ' ', ''])
+
+2.	Promena "null" vrednosti -,/,razmak, blanko na NaN.
+
+special_missing = ['-', ' ', '']
+print(data_subset.isin(['-', ' ', '']).sum())
+data_subset.replace(special_missing, np.nan, inplace=True)
+
+ILI putem načina 1.2.
+
+3.	Pretvoriti numeričke u numeric, ako već nisu. ! NE I TEKSTUALNE !
+pd.to_numeric(data_subset['naziv_kolone'], errors='coerce')
+
+Tekstualne promenljive pretvarati putem one hot encoding-a SAMO KADA IMA SMISLA ZA MODEL .
+
+
+
+4.	Proveriti NA vrednosti. Ako ima značajan broj nedostajućih vrednosti, izbaciti iz dataset-a.
+Koristiti funkciju dropna().
+
+5.	Proveriti uz shapiro test da li je raspodela normalna ili ne. Ako JESTE menjamo mean (aritmetičkom sredinom), ako NIJE menjamo medijanom. (Za sada, dozvoljeno je i menjanje medijanom odmah).
+6.	# Atributi sa NA (ali koji nisu izbačeni kao calcium)
+cols_with_na = ['cal_fat', 'fiber', 'protein']
+
+for col in cols_with_na:
+    series = data_numeric[col].dropna()
+    stat, p = shapiro(series)
+    print(f"{col}: p = {p:.5f} → {'nije normalna' if p < 0.05 else 'normalna'} distribucija")
+
+for col in cols_with_na:
+    median = data_numeric[col].median()
+    data_numeric[col] = data_numeric[col].fillna(median)
+
+data_numeric.isna().sum()
+
+
+VISESTRUKA LINEARNA
+1.	Iscrtati korelacionu matricu (Dostupno u helperu).
+2.	U zavisnosti šta se predviđa, uzeti vrednosti koje su dosta iznad 0,5 u korelaciji sa vrednošću koju predviđamo.
+3.	Podeliti na train i test set 80% i 20%
+4.	Kreirati model putem OLS: ISKLJUČIVO NA TRAIN SET-U
+lm1 = smf.ols(f'{target} ~ ' + ' + '.join(features), data=train_df).fit()
+print(lm1.summary())
+Tumačenje: 
+-	Reziduali – odstupanja predviđene od stvarne vrednosti.
+-	R-squared: % objašnjene varijabilnosti ciljne promenljive.
+-	Intercept – Kada su sve nezavisne promenljive jednake nuli, očekivana vrednost izlazne promenljive je: X
+-	Koeficijenti: Povećanje za 1 jedinicu dovodi do povećanja/smanjenja izlazne promenljive.
+-	P values < 0,05 – statistički značajna vrednost.
+-	F-statistika – što veća, p-vrednost što manja.
+5.	Izvršiti predikcije ISKLJUČIVO NA TEST SET-U i protumačiti ih putem dijagnostičkih grafikona (dostupni u helperu).
+-	Residuals vs Fitted
+Grafikon prikazuje raspodelu reziduala (razlike između stvarnih i predviđenih vrednosti) u odnosu na predviđene vrednosti. Reziduali bi trebalo da budu raspoređeni oko horizontalne linije (vrednost bliska nuli).
+-	Normal Q-Q
+Ovaj grafikon prikazuje da li reziduali imaju normalnu raspodelu.
+Tačke bi trebalo da leže duž dijagonale.
+-	Scale-Location
+Prikazuje da li je varijabilnost (varijansa) reziduala konstantna duž predikcija. Idealno, crvena linija treba da bude horizontalna i da tačke budu ravnomerno raspoređene.
+-	Residuals vs Leverage
+Ovaj grafikon identifikuje ekstremno visoke/niske vrednosti (outliere) i njihove uticaje na model. Većina tačaka bi trebalo da bude unutar granica, a ekstremne vrednosti retke.
+6.	Izračunati metrike:
+rss = ((y_pred - y_true) ** 2).sum()
+tss = ((y_true.mean() - y_true) ** 2).sum() # TSS meri totalnu „nepredvidivost“
+# R² na test-skupu
+r2_test = 1 - rss / tss
+# RMSE na test-skupu
+#Kvadriramo da izbegnemo +/-
+#Onda uzmemo koren da vratimo na realnu skalu. Deljenjem sa duzinom vracamo skalu na jednu opservaciju
+rmse_test = np.sqrt(rss / len(y_true))
+print(f"RSS = {rss:.2f}") # tezimo nuli
+print(f"R²  = {r2_test:.3f}") # Veće je bolje -  procenat varijanse objašnjen modelom
+print(f"RMSE = {rmse_test:.2f}") # tezimo nuli
+6.1.	Drugi način:
+rss = mean_squared_error(y_true,y_pred)*len(y_true)
+r2_test = r2_score(y_true, y_pred)
+rmse_test = mean_squared_error(y_true,y_pred)**0.5
+
+7.	Provera multikolinearnosti pomoću VIF (videti helper). VIF>2 izbacuje se kolona, pa se opet računa VIF.
+
+
+STABLO ODLUCIVANJA
+
+1.	Kreira se izlazna varijabla na osnovu zadatka.
+2.	OBAVEZNO UKLONITI VARIJABLE KOJE SU KORIŠĆENE ZA KREIRANJE IZLAZNE VARIJABLE!!!
+3.	Kreirati plotove za svaku varijablu u odnosu na izlaznu.
+Plt = matplotlib, sb = seaborne
+Za numeričke varijable:
+plt.figure(figsize=(6,4))
+sb.kdeplot(data=df, x='CreditScore', hue='Stayed', fill=True, alpha=0.55)
+plt.tight_layout()
+plt.show()
+	Ukoliko se raspodele preklapaju ne prihvatati varijablu u model. U suprotnom prihvatiti.
+ 
+Takođe za kategoričke varijable:
+plt.figure(figsize=(6,4))
+sb.countplot(data=df, x='HasCrCard', hue='Stayed', palette='pastel')
+plt.xlabel('HasCrCard')
+plt.ylabel('Broj klijenata')
+plt.legend(title='Stayed')
+plt.tight_layout()
+plt.show()
+
+4.	Transformisati kategoričke varijable u numeričke
+from sklearn.preprocessing import OneHotEncoder
+ohe = OneHotEncoder(sparse_output=False, drop='first')
+cats = ['Geography', 'Gender']
+encoded_array = ohe.fit_transform(df[cats])
+encoded_cols = ohe.get_feature_names_out(cats)
+
+df_ohe = pd.DataFrame(encoded_array, columns=encoded_cols, index=df.index)
+df = df.drop(columns=cats).join(df_ohe)
+5.	IZBACITI IZLAZNU VARIJABLU!!! Prilikom kreiranja train i test skupova i navesti stratify
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
+
+6.	Izračunati vrednost za CCP alpha
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.model_selection import GridSearchCV,StratifiedKFold
+cv  = StratifiedKFold(n_splits=10, shuffle=True, random_state=42)
+param_grid = {'ccp_alpha':np.arange(0.0,0.05,0.0025)}
+grid = GridSearchCV(DecisionTreeClassifier(random_state=42),
+                    param_grid=param_grid,
+                    cv=cv,
+                    scoring='accuracy')
+grid.fit(X_train, y_train)
+best_ccp_alpha = grid.best_params_['ccp_alpha']
+print("Najbolja vrednost ccp_alpha:",best_ccp_alpha)
+
+7.	Kreirati model stable odlučivanja i iscrtati grafikon
+tree = DecisionTreeClassifier(ccp_alpha=best_ccp_alpha,random_state=42)
+tree.fit(X_train, y_train)
+plt.figure(figsize=[30,10])
+plot_tree(tree,
+          feature_names=X_train.columns,
+          class_names=['No','Yes'],
+          filled=True,
+          rounded=True,
+          fontsize=10)
+plt.title("Stablo odlučivanja - tree")
+plt.show()
+
+8.	Kreirati predikcije.
+9.	Nacrtati matricu konfuzije
+cm = confusion_matrix(y_test, y_pred)
+print("Matrica kofuzije:")
+print(cm)
+cm_df = pd.DataFrame(cm,
+                       index = ['Stvarno:No','Stvarno:Yes'],
+                     columns = ['Predviđeno:No','Predviđeno:Yes'])
+print(cm_df)
+
+
+
+10.	Izračunati metrike
+def compute_basic_eval_measures(cm, model_name=""):
+
+    from pandas import Series
+
+    TP = cm[1,1]
+    TN = cm[0,0]
+    FP = cm[0,1]
+    FN = cm[1,0]
+
+    accuracy = (TP + TN)/cm.sum()
+    precision = TP/(TP + FP)
+    recall = TP/(TP + FN)
+    F1 = 2*precision*recall/(precision + recall)
+
+    return Series(data=[accuracy, precision, recall, F1],
+                  index=['accuracy', 'precision', 'recall', 'F1'],
+                  name=model_name)
+Iskomentarisati:
+Accuracy - % tačnog predviđanja.
+Precision - % realne procene izlazne varijable.
+Recall - % realne vrednosti koja je predviđena.
+F1 - % greške. 
+10.1.	Drugi način:
+accuracy = accuracy_score(y_test, y_pred)
+precision = precision_score(y_test, y_pred)
+recall = recall_score(y_test, y_pred)
+f1 = f1_score(y_test, y_pred)
+
+print("Accuracy:", accuracy)
+print("Precision:", precision)
+print("Recall:", recall)
+print("F1:", f1)
+10.2.	Treći način:
+print(classification_report(y_test, y_pred))
+
+
+
+KNN
+
+1.	Izvršiti odabir promenljivih kao i u prethodnom modelu.
+2.	Proveriti outlier-e
+# Funkcija za izračunavanje broja autlajera
+def count_outliers(variable):
+    q1 = variable.quantile(0.25)
+    q3 = variable.quantile(0.75)
+    iqr = q3 - q1
+    lower = q1 - 1.5 * iqr
+    upper = q3 + 1.5 * iqr
+    return ((variable < lower) | (variable > upper)).sum()
+
+outliers_per_column = df[numeric_vars].apply(count_outliers)
+print("Broj autlajera po kolonama:\n", outliers_per_column)
+# Sve varijable imaju autlajere, tako da ćemo koristiti standardizaciju
+df[numeric_vars].boxplot(figsize=(10,5))
+plt.xticks(rotation=45)
+plt.show()
+
+3.	Za kolone koje nemaju outlier-e koristi se normalizacija, a za one koje imaju standardizacija.
+Proveriti normalnu raspodelu:
+shapiro_results = df[numeric_vars].apply(lambda x: shapiro(x)[1])
+print("Shapiro-Wilk p-vrednosti:\n", shapiro_results)
+
+A zatim za sve vrednosti p<0,05
+# Standardizujemo numeričke varijable pomoću RobustScaler-a
+robust_scaler = RobustScaler()
+df_st = pd.DataFrame() # Kreiramo prazan DataFrame u koji ćemo ubaciti sve vrednosti pripremljene za KNN
+df_st[numeric_vars] = robust_scaler.fit_transform(df[numeric_vars])
+
+Za normalizaciju se koristi MinMaxScaler
+scaler = MinMaxScaler()
+X_norm = scaler.fit_transform(X)
+4.	Podeliti na train i test skupove.
+5.	Izabrati optimalnu vrednost K
+
+knn = KNeighborsClassifier()
+
+# Koristimo neparne vrednosti za k (broj suseda) u opsegu od 3 do 25 kako bi uvek postojala dominantna klasa
+param_grid = {'n_neighbors': list(range(3, 26, 2))}
+
+# Primenjujemo kros validaciju sa 10 iteracija
+cv = GridSearchCV(estimator=knn,
+                  param_grid=param_grid,
+                  cv=10,
+                  scoring='accuracy',
+                  verbose = 1,
+                  n_jobs = -1)
+cv.fit(X_train, y_train)
+
+best_k = cv.best_params_['n_neighbors']
+print("Optimalna vrednost za k:", best_k)
+
+6.	Kreirati matricu konfuzije, može i bez plot-a i prokomentarisati.
+cm_knn = confusion_matrix(y_test, y_pred)
+
+disp = ConfusionMatrixDisplay(confusion_matrix=cm_knn,
+                              display_labels=['No', 'Yes'])
+disp.plot(cmap=plt.cm.Blues)
+plt.show()
+
+7.	Izračunati metrike (isto kao u prethodnom modelu).
+
+
+
+NEURONSKE MREZE
+
+1.	Skalirati podatke metodom po izboru (videti prethodne modele za normalizaciju/standardizaciju).
+2.	Podeliti na train i test set.
+3.	Kreirati neuronsku mrežu sa proizvoljnim parametrima:
+mlp1=MLPClassifier(hidden_layer_sizes=(64,32), max_iter=1000, random_state=42, solver='sgd')
+
+Može biti značajno za objasniti:
+-	Tokom treninga neuronske mreže izvršavaju se sledeći koraci:
+-	Forward propagation - ulazni podaci prolaze kroz mrežu i izračunava se predikcija modela.
+-	Računanje greške (loss) - predikcije modela porede se sa stvarnim vrednostima i izračunava se greška modela.
+-	Backward propagation - na osnovu izračunate greške određuje se kako svaki parametar mreže utiče na grešku.
+-	Ažuriranje parametara - težine i bias vrednosti mreže ažuriraju se pomoću optimizacionog algoritma sa ciljem smanjenja greške modela.
+-	Ovaj proces se ponavlja kroz više epoha, pri čemu jedna epoha predstavlja jedan prolazak kroz ceo trening skup podataka.
+
+4.	Prikazati funkciju greške
+plt.figure()
+plt.plot(mlp1.loss_curve_)
+plt.xlabel("Iteracija")
+plt.ylabel("Loss")
+plt.grid()
+plt.show()
+
+5.	Prikazati i prokomentarisati matricu konfuzije (isto kao u ranijim modelima).
+6.	Izračunati evaluacione metrike (isto kao i u prethodnim modelima) i objasniti ih.
+
+
+
+HIJARARHIJSKA KLASTERIZACIJA
+
+Ukoliko je u zadatku pomenuto „primenom dendrograma“ uglavnom se radi o hijerarhijskoj klasterizaciji.
+
+1.	Iscrtati matricu korelacije. Pogledati da li su neke od promenljivih u visokoj korelaciji jedna sa drugom. Izbaciti sve osim jedne od tih promenljivih. NAPOMENA: NE IZBACIVATI PRETHODNO PRETVORENE KATEGORIČKE PROMENLJIVE U NUMERIČKE!!!
+2.	Proveriti koliko kolona ima outlier-e. Ako ima preko 10% outlier-a, kolona se izbacuje, ako nema radi se winsorize.
+# Uvodimo pomoćnu funkciju draw_boxplot koja crta i prikazuje boxplot
+def draw_boxplot(podaci, naslov):
+    plt.boxplot(podaci)
+    plt.xlabel(naslov)
+    plt.show()
+
+from scipy.stats.mstats import winsorize
+#Tražimo outliere, kolona "in_spotify_playlists"
+draw_boxplot(cl_data["in_spotify_playlists"], "in_spotify_playlists")
+# ima outliere samo na gornjoj granici, winsorize u rasponu 0 - 90 ne otklanja sve outlier-e
+winsorized_data = winsorize(cl_data["in_spotify_playlists"], limits=[0.00, 0.10])
+draw_boxplot(winsorized_data, "Winsorized in_spotify_playlists")
+plt.show()
+#Zaključak je da više od 10% vrednosti ove promenljive čine outlier-i i treba je izbaciti iz dataset-a
+cl_data.drop(columns = ["in_spotify_playlists"], inplace = True)
+3.	Skalirati podatke kao u ranijim modelima  putem MinMaxScaler.
+4.	Iscrtati dendrograme i protumačiti najbolju vrednost k
+5.	from scipy.cluster.hierarchy import linkage, dendrogram
+
+#Prikaz dendrograma za različite linkage metode
+dendrogram(linkage(cl_data_scaled, method='ward', metric='euclidean'))
+plt.title("Ward linkage dendrogram")
+plt.show()
+
+dendrogram(linkage(cl_data_scaled, method='single', metric='euclidean'))
+plt.title("Single linkage dendrogram")
+plt.show()
+
+dendrogram(linkage(cl_data_scaled, method='complete', metric='euclidean'))
+plt.title("Complete linkage dendrogram")
+plt.show()
+
+dendrogram(linkage(cl_data_scaled, method='average', metric='euclidean'))
+plt.title("Average linkage dendrogram")
+plt.show()
+
+Izabrati one linkage metode koje daju jasno odvojene klastere na dendrogramu.
+
+
+6.	Izvršiti hijerarhijsku klasterizaciju
+7.	h_cluster = cluster.AgglomerativeClustering(n_clusters=2, linkage = "ward", metric="euclidean").fit(cl_data_scaled)
+
+# U dataset u kojem se nalaze skalirani podaci
+# dodajemo novu kolonu sa oznakama koja instanca
+# pripada kojem klasteru.
+cl_data_scaled["cluster"] = h_cluster.labels_
+
+8.	Interpretirati pomoću boxplot-a:
+
+fig, ax = plt.subplots(1,2)
+
+# U novijoj verziji matplotlib-a se umesto labels koristi tick_labels
+ax[0].boxplot(cl_data_scaled[cl_data_scaled["cluster"]==0].drop(columns = ["cluster"]), labels=("sc", "bpm", "mod", "enr", "liv"))
+ax[0].set_xlabel("Klaster 1")
+
+# U novijoj verziji matplotlib-a se umesto labels koristi tick_labels
+ax[1].boxplot(cl_data_scaled[cl_data_scaled["cluster"]==1].drop(columns = ["cluster"]), labels=("sc", "bpm", "mod", "enr", "liv"))
+ax[1].set_xlabel("Klaster 2")
+
+plt.show()
+
+print("Klaster 1, N = ", cl_data_scaled.loc[cl_data_scaled["cluster"]==0, "cluster"].count())
+print("Klaster 2, N = ", cl_data_scaled.loc[cl_data_scaled["cluster"]==1, "cluster"].count())
+
+9.	Ukoliko klasteri imaju malo razlike ili su u drugom smislu slični, ponovno izvršiti klasterizaciju ovaj put na veći broj klastera. Ponovo interpretirati rezultate (Obično tada budu zadovoljavajući).
+
+
+
+KMEANS KLASTERIZACIJA
+
+U zadatku se uglavnom pominje „pomoću lakat/elbow funkcije“.
+(Prethodni koraci su isti kao koraci 1-4).
+5. Iscrtati dijagram lakat funkcije i videti mesta gde se funkcija naglo spušta. Ta mesta su „lakat“ i X koordinate tog mesta predstavljaju broj K koji treba iskoristiti.
+wcss = []
+
+# Probamo od 1 do 10 klastera
+for i in range(1, 11):
+    kmeans = cluster.KMeans(n_clusters=i, init='k-means++', max_iter=100, n_init=1000, random_state=0).fit(cl_data_scaled)
+    wcss.append(kmeans.inertia_)
+
+plt.plot(range(1, 11), wcss)
+plt.xlabel("Broj klastera (K)")
+plt.ylabel("WCSS greška")
+plt.show()
+
+wcss
+
+6.  Izvršiti klasterizaciju sa izabranim K.
+# Radimo KMeans klasterizaciju sa dva klastera i kmeans++ metodom za inicijalizaciju težišta
+kmeans = cluster.KMeans(n_clusters=2, init='k-means++', max_iter=100, n_init=1000, random_state=0)
+kmeans.fit(cl_data_scaled)
+
+# U dataset u kojem se nalaze skalirani podaci
+# dodajemo novu kolonu sa oznakama koja instanca
+# pripada kojem klasteru
+cl_data_scaled["cluster"] = kmeans.labels_
+
+7.	Protumačiti rezultate box plota kao i u prethodnom modelu. Pokušati sa drugim laktom ukoliko ga ima.
+8.	Protumačiti rezultate novih box plotova.
