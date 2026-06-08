@@ -39,9 +39,10 @@ data_numeric.isna().sum()
 
 
 VISESTRUKA LINEARNA
+
 1.	Iscrtati korelacionu matricu (Dostupno u helperu).
 2.	U zavisnosti šta se predviđa, uzeti vrednosti koje su dosta iznad 0,5 u korelaciji sa vrednošću koju predviđamo.
-3.	Podeliti na train i test set 80% i 20%
+3.	Podeliti na train i test set 80% i 20% (stratify= pd.qcut(df['izlazna prom'], q=10, duplicates='drop')))
 4.	Kreirati model putem OLS: ISKLJUČIVO NA TRAIN SET-U
 lm1 = smf.ols(f'{target} ~ ' + ' + '.join(features), data=train_df).fit()
 print(lm1.summary())
